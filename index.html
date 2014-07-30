@@ -1,0 +1,185 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Reading</title>
+
+  <link rel="stylesheet" href="http://netdna.bootstrapcdn.com/bootstrap/3.2.0/css/bootstrap.min.css">
+  <style type="text/css">
+  .data {
+    height: 300px;
+  }
+  .rating-data {
+    height: 75px;
+  }
+  .axis path,
+  .axis line {
+    fill: none;
+    stroke: black;
+    shape-rendering: crispEdges;
+  }
+  .axis {
+    font-size: 12px;
+  }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <h1>Reading in 2014</h1>
+
+  <div id="ratings" class="rating-data"></div>
+
+  <div id="timeline" class="data"></div>
+
+</div>
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/jquery/2.1.1/jquery.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/d3/3.4.11/d3.min.js"></script>
+<script>
+//<![CDATA[
+
+var data;
+
+d3.json('/data/timeline.json', function(err, json) {
+  if (err) { return console.warn(err); }
+
+  renderTimeline(json);
+});
+
+d3.json('/data/ratings.json', function(err, json) {
+  if (err) { return console.warn(err); }
+
+  renderRatings(json);
+});
+
+var color = d3.scale.ordinal()
+                    .domain([0, 3])
+                    .range(['rgb(59,160,252)', 'rgb(255,180,2)', 'rgb(148,102,232)', 'rgb(232,20,12)']);
+
+
+var renderTimeline = function(data) {
+  var container = '#timeline',
+      width     = $(container).width(),
+      height    = $(container).height(),
+      stack     = d3.layout.stack();
+
+  stack(data);
+
+
+  // TODO: make the domain here dynamic
+  var xScale = d3.time.scale()
+                       .domain([Date.parse('2014-01-01'), Date.parse('2014-06-30')])
+                       .range([20, (width-20)]);
+  var xAxis = d3.svg.axis()
+                    .scale(xScale)
+                    .orient('bottom');
+
+  // TODO: make the domain here dynamic
+  var yScale = d3.scale.linear()
+                       .domain([0, 4])
+                       .range([0, (height-20)]);
+
+  var svg  = d3.select(container)
+               .append('svg')
+               .attr('width', width)
+               .attr('height', height);
+
+  var groups = svg.selectAll('g')
+                  .data(data)
+                  .enter()
+                  .append('g')
+                  .style('fill', function(d, i) { return color(i); });
+
+  var bars = groups.selectAll('rect')
+                   .data(function(d) { return d; })
+                   .enter()
+                   .append('rect');
+
+  bars.attr({
+    x:      function(d) { return xScale(Date.parse(d.x)); },
+    y:      function(d) { return height - 20 - yScale(d.y0 + d.y); },
+    height: function(d) { return yScale(d.y); },
+    width:  4
+  });
+
+  svg.append('g')
+     .call(xAxis)
+     .attr({
+       class: 'axis',
+       transform: 'translate(0,'+ (height-20) +')'
+     });
+};
+
+var renderRatings = function(data) {
+  var container = '#ratings',
+      width     = $(container).width(),
+      height    = $(container).height(),
+      stack     = d3.layout.stack();
+
+  var max = d3.sum(data, function(d) { return d.y });
+
+  var arrays = [];
+  data.forEach(function(d) { arrays.push([d]) });
+
+  stack(arrays);
+
+  var xScale = d3.scale.linear()
+                       .domain([0, max])
+                       .range([20, (width-40)]);
+
+  var svg  = d3.select(container)
+               .append('svg')
+               .attr('width', width)
+               .attr('height', height);
+
+  var bars = svg.selectAll('rect')
+                .data(data)
+                .enter()
+                .append('rect');
+
+  bars.attr({
+    x: function(d,i) { return xScale(d.y0) },
+    y: 0,
+    height: 50,
+    width: function(d) { return xScale(d.y) },
+    fill: function(d) {
+      catIdx = d.category == 'fiction' ? 0 : 1;
+      base = d3.rgb(color(catIdx)).hsl();
+
+      brighten = (5 - d.x/1)/5;
+      return base.brighter(brighten);
+    }
+  });
+
+  labels = [
+    {
+      text: "Fiction: " + d3.sum(data, function(d) { return d.category == 'fiction' ? d.y : 0 }),
+      x: 0
+    },
+    {
+      text: "Non-fiction: " + d3.sum(data, function(d) { return d.category == 'nonfiction' ? d.y : 0 }),
+      x: d3.sum(data, function(d) { return d.category == 'fiction' ? d.y : 0 })
+    }
+  ]
+  console.log(labels);
+  svg.selectAll('text')
+     .data(labels)
+     .enter()
+     .append('text')
+     .text(function(d,i) { return d.text })
+     .attr({
+       x: function(d,i) { return xScale(d.x)+10 },
+       y: 25,
+       dy: '0.33em',
+       fill: 'white'
+     });
+};
+
+//]]>
+</script>
+</body>
+</html>
