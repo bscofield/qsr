@@ -47,7 +47,7 @@ var data;
 d3.json('/data/timeline.json', function(err, json) {
   if (err) { return console.warn(err); }
 
-  renderTimeline(json);
+  renderTimeline(json.ratings);
 });
 
 d3.json('/data/ratings.json', function(err, json) {
@@ -56,9 +56,19 @@ d3.json('/data/ratings.json', function(err, json) {
   renderRatings(json);
 });
 
-var color = d3.scale.ordinal()
-                    .domain([0, 3])
-                    .range(['rgb(59,160,252)', 'rgb(255,180,2)', 'rgb(148,102,232)', 'rgb(232,20,12)']);
+
+var ratingColors = function(d) {
+  var color = d3.scale.ordinal()
+                      .domain([0, 1])
+                      .range(['rgb(59,160,252)',  'rgb(148,102,232)']);
+
+  catIdx = d.category == 'fiction' ? 0 : 1;
+  base = d3.rgb(color(catIdx)).hsl();
+
+  brighten = (5 - d.rating/1)/4;
+  return base.brighter(brighten);
+};
+
 
 
 var renderTimeline = function(data) {
@@ -69,14 +79,13 @@ var renderTimeline = function(data) {
 
   stack(data);
 
-
-  // TODO: make the domain here dynamic
   var xScale = d3.time.scale()
-                       .domain([Date.parse('2014-01-01'), Date.parse('2014-06-30')])
+                       .domain(d3.extent(data[0], function(d) { return Date.parse(d.x) } ))
                        .range([20, (width-20)]);
   var xAxis = d3.svg.axis()
                     .scale(xScale)
                     .orient('bottom');
+
 
   // TODO: make the domain here dynamic
   var yScale = d3.scale.linear()
@@ -91,8 +100,7 @@ var renderTimeline = function(data) {
   var groups = svg.selectAll('g')
                   .data(data)
                   .enter()
-                  .append('g')
-                  .style('fill', function(d, i) { return color(i); });
+                  .append('g');
 
   var bars = groups.selectAll('rect')
                    .data(function(d) { return d; })
@@ -103,7 +111,8 @@ var renderTimeline = function(data) {
     x:      function(d) { return xScale(Date.parse(d.x)); },
     y:      function(d) { return height - 20 - yScale(d.y0 + d.y); },
     height: function(d) { return yScale(d.y); },
-    width:  4
+    width:  4,
+    fill: function(d, i) { return ratingColors(d); }
   });
 
   svg.append('g')
@@ -146,13 +155,7 @@ var renderRatings = function(data) {
     y: 0,
     height: 50,
     width: function(d) { return xScale(d.y) },
-    fill: function(d) {
-      catIdx = d.category == 'fiction' ? 0 : 1;
-      base = d3.rgb(color(catIdx)).hsl();
-
-      brighten = (5 - d.x/1)/5;
-      return base.brighter(brighten);
-    }
+    fill: function(d) { return ratingColors(d) }
   });
 
   labels = [
@@ -165,7 +168,7 @@ var renderRatings = function(data) {
       x: d3.sum(data, function(d) { return d.category == 'fiction' ? d.y : 0 })
     }
   ]
-  console.log(labels);
+
   svg.selectAll('text')
      .data(labels)
      .enter()
