@@ -2,8 +2,18 @@ require 'json'
 require 'csv'
 require 'pp'
 
-data = CSV.read('data/books.csv', headers: true)
-data = data.select {|row| Date.parse(row['Date Read'])< Date.parse(ARGV[0] || '2014-07-01')}
+data_file = 'data/books.csv'
+source = ARGV[0]
+File.open(data_file, 'w') do |f|
+  File.open(source, 'r').readlines.each do |line|
+    f.puts line.gsub(/="/, '"')
+  end
+end
+
+shelf = ARGV[1] || 'read-2014'
+
+data = CSV.read(data_file, headers: true)
+data = data.select {|row| row['Bookshelves'] =~ /#{Regexp.quote shelf}/ }
 data = data.inject([]) do |arr, row|
   shelves = row['Bookshelves'].split(',').map(&:strip)
   category = shelves.delete('non-fiction') || shelves.delete('fiction')
